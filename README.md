@@ -1,5 +1,8 @@
 # 🪝 Hookpit
 
+[![CI](https://github.com/Aliweb789/hookpit/actions/workflows/ci.yml/badge.svg)](https://github.com/Aliweb789/hookpit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **A self-hostable webhook inspector.** Get a URL in one click, point Stripe / GitHub / your own code at it, and watch every request appear live, with its exact method, headers, query and raw body.
 
 Your payloads stay on your own server instead of a third-party site.
@@ -81,7 +84,8 @@ Stripe / GitHub / curl ──HTTP──►  API (NestJS)  ──►  SQLite file
 - [ ] OpenAPI import to generate mock endpoints
 - [ ] CLI that forwards requests to `localhost` (`npx hookpit listen 3000`)
 - [ ] Automatic expiry and rate limiting for public instances
-- [ ] Tests and CI
+- [x] CI (build on every pull request)
+- [ ] Automated tests
 
 ## Contributing
 

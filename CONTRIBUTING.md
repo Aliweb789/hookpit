@@ -36,6 +36,17 @@ For API changes, `npm run dev:api` rebuilds automatically.
    `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`
 5. Push and open a pull request. Describe *what* changed and *how you tested it*.
 
+## Continuous integration (CI)
+
+Every pull request automatically runs [GitHub Actions](.github/workflows/ci.yml), which installs dependencies with `npm ci` and runs `npm run build` on Node 20. A PR needs a green check before it is merged.
+
+If CI fails on your PR, open the failing run from the PR's **Checks** tab to see the log. You can reproduce it locally with:
+
+```bash
+npm ci
+npm run build
+```
+
 Not sure whether an idea fits? Open an issue first and we'll talk it through before you spend time on code.
 
 ## Guidelines
