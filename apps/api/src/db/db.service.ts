@@ -40,7 +40,8 @@ export class DbService implements OnModuleDestroy {
         path       TEXT NOT NULL,             -- pattern such as /users/:id
         status     INTEGER NOT NULL,
         headers    TEXT NOT NULL,             -- JSON object
-        body       TEXT NOT NULL,             -- may contain {{placeholders}}
+        body       TEXT NOT NULL,             -- may contain {{placeholders}}, or base64
+        body_encoding TEXT NOT NULL DEFAULT 'text', -- 'text' or 'base64'
         delay_ms   INTEGER NOT NULL,
         enabled    INTEGER NOT NULL,          -- 1 or 0
         created_at TEXT NOT NULL
@@ -48,6 +49,16 @@ export class DbService implements OnModuleDestroy {
       CREATE INDEX IF NOT EXISTS idx_mock_rules_slug
         ON mock_rules (slug, position);
     `);
+    this.migrate();
+  }
+
+  // Columns added after a table was first released. CREATE TABLE IF NOT EXISTS
+  // leaves existing databases untouched, so add any missing column here.
+  private migrate() {
+    const columns = this.db.prepare('PRAGMA table_info(mock_rules)').all() as { name: string }[];
+    if (!columns.some((c) => c.name === 'body_encoding')) {
+      this.db.exec("ALTER TABLE mock_rules ADD COLUMN body_encoding TEXT NOT NULL DEFAULT 'text'");
+    }
   }
 
   onModuleDestroy() {
