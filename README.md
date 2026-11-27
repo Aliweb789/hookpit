@@ -36,7 +36,7 @@ curl -X POST http://localhost:4000/h/<your-slug> \
   -d '{"hello":"world"}'
 ```
 
-> The Docker setup is new and has not been tested on many machines yet. If something breaks, please [open an issue](../../issues).
+> Tested on macOS (Apple Silicon) with Docker Desktop. Running it elsewhere (Linux, Windows, Intel)? Please tell us how it went in [this issue](../../issues/8), and [open an issue](../../issues) if something breaks.
 
 Hosting on a real domain? Set the API address your *browser* will use:
 
