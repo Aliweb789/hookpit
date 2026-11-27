@@ -80,7 +80,12 @@ export class CaptureController {
     res.status(mock.status);
     for (const [name, value] of Object.entries(mock.headers)) res.setHeader(name, value);
     if (!res.hasHeader('content-type')) {
-      res.setHeader('content-type', isJson(mock.body) ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
+      res.setHeader(
+        'content-type',
+        Buffer.isBuffer(mock.body)
+          ? 'application/octet-stream'
+          : isJson(mock.body) ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8',
+      );
     }
     // Forced on every mock response. The body and content type are user-supplied
     // but served from our origin, so stop browsers from sniffing or running it as a page.
