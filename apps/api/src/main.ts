@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import * as express from 'express';
 import { AppModule } from './app.module';
+import { configureApp } from './app.setup';
 
 async function bootstrap() {
   // bodyParser: false -> Nest will NOT parse bodies for us.
@@ -9,12 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
   });
-
-  // Keep every body under /h/* as a raw Buffer, whatever its content type.
-  app.use('/h', express.raw({ type: () => true, limit: '1mb' }));
-
-  // The dashboard (a different origin in dev) needs permission to call us.
-  app.enableCors();
+  configureApp(app);
 
   const port = Number(process.env.PORT ?? 4000);
   await app.listen(port);

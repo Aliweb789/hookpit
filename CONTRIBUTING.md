@@ -31,20 +31,32 @@ For API changes, `npm run dev:api` rebuilds automatically.
 
 1. **Fork** the repo and create a branch: `git switch -c feat/short-description`
 2. Make your change. Keep it focused: one idea per pull request.
-3. Make sure both apps still build: `npm run build`
+3. Make sure both apps still build and the tests pass: `npm run build && npm test`
 4. Commit using [Conventional Commits](https://www.conventionalcommits.org/):
    `feat: ...`, `fix: ...`, `docs: ...`, `chore: ...`
 5. Push and open a pull request. Describe *what* changed and *how you tested it*.
 
 ## Continuous integration (CI)
 
-Every pull request automatically runs [GitHub Actions](.github/workflows/ci.yml), which installs dependencies with `npm ci` and runs `npm run build` on Node 20. A PR needs a green check before it is merged.
+Every pull request automatically runs [GitHub Actions](.github/workflows/ci.yml), which installs dependencies with `npm ci`, runs `npm run build` and then `npm test` on Node 20. A PR needs a green check before it is merged.
+
+## Tests
+
+The API has unit tests (`apps/api/src/**/*.spec.ts`) and end-to-end HTTP tests (`apps/api/test/*.e2e-spec.ts`), run with [Jest](https://jestjs.io/):
+
+```bash
+npm test                          # everything, from the repo root
+npm test -w apps/api -- --watch   # re-run on file changes
+```
+
+Tests use an in-memory SQLite database, so they never touch your real data. If you add a feature or fix a bug in the API, please add a test for it. A good bug-fix test fails *before* your fix and passes after.
 
 If CI fails on your PR, open the failing run from the PR's **Checks** tab to see the log. You can reproduce it locally with:
 
 ```bash
 npm ci
 npm run build
+npm test
 ```
 
 Not sure whether an idea fits? Open an issue first and we'll talk it through before you spend time on code.
