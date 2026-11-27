@@ -9,6 +9,27 @@ Your payloads stay on your own server instead of a third-party site.
 
 > **Status: early (v0.1).** Capture, live inspection and replay work today. Mocking and signature checks are on the [roadmap](#roadmap). Contributions are very welcome.
 
+## Demo
+
+**1. Catch.** Point any service at your capture URL. Every request shows up live with its exact method, path, query, headers and raw body.
+
+![Hookpit dashboard showing three captured requests and the details of a Stripe-style webhook](docs/dashboard.jpg)
+
+**2. Replay.** Fixed your handler? Resend the same request to your app, optionally editing the method or body first, and see exactly how it responded.
+
+![Hookpit replay panel showing a 202 Accepted response from the target](docs/replay.jpg)
+
+Try it in 30 seconds, once Hookpit is running (see [Quick start](#quick-start)):
+
+```bash
+# 1. create an endpoint in the dashboard at http://localhost:3000, then
+# 2. send it anything:
+curl -X POST http://localhost:4000/h/<your-slug>/stripe/events \
+  -H "Content-Type: application/json" \
+  -d '{"type":"payment_intent.succeeded","data":{"object":{"amount":4200}}}'
+# 3. watch it appear, click it, and press Replay
+```
+
 ## Features
 
 - ✅ Unique capture URL per endpoint (`/h/<slug>`), any HTTP method and sub-path
