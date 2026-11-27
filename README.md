@@ -11,13 +11,21 @@ Your payloads stay on your own server instead of a third-party site.
 
 ## Demo
 
+![Hookpit home page: "Catch, inspect, replay and mock webhooks"](docs/home.jpg)
+
 **1. Catch.** Point any service at your capture URL. Every request shows up live with its exact method, path, query, headers and raw body.
 
-![Hookpit dashboard showing three captured requests and the details of a Stripe-style webhook](docs/dashboard.jpg)
+![Hookpit endpoint page with a list of captured requests and the headers and JSON body of a Stripe-style webhook](docs/dashboard.jpg)
 
 **2. Replay.** Fixed your handler? Resend the same request to your app, optionally editing the method or body first, and see exactly how it responded.
 
 ![Hookpit replay panel showing a 202 Accepted response from the target](docs/replay.jpg)
+
+**3. Mock.** Make the capture URL answer like a real API: set the status, headers, a body with placeholders such as `{{now}}`, and a delay.
+
+![Hookpit mock responses panel editing a GET /health rule](docs/mocks.jpg)
+
+The interface follows your system's light or dark theme.
 
 Try it in 30 seconds, once Hookpit is running (see [Quick start](#quick-start)):
 
