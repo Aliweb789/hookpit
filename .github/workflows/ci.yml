@@ -1,0 +1,33 @@
+name: CI
+
+# Run on every pull request, and on every push to main.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege: this workflow only needs to read the code.
+permissions:
+  contents: read
+
+# If you push again to the same branch, cancel the older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm # caches ~/.npm between runs to speed up installs
+
+      # "npm ci" installs exactly what package-lock.json says (reproducible).
+      - run: npm ci
+
+      # Builds apps/api (NestJS) then apps/web (Next.js, includes type checks).
+      - run: npm run build
