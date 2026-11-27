@@ -10,6 +10,7 @@ interface MockRule {
   status: number;
   headers: Record<string, string>;
   body: string;
+  bodyEncoding: 'text' | 'base64';
   delayMs: number;
   enabled: boolean;
 }
@@ -23,9 +24,10 @@ interface Form {
   delayMs: string;
   headers: string; // one "Name: value" per line
   body: string;
+  bodyEncoding: string; // 'text' or 'base64'
 }
 
-const EMPTY: Form = { method: '*', path: '/', status: '200', delayMs: '0', headers: 'Content-Type: application/json', body: '{"ok":true}' };
+const EMPTY: Form = { method: '*', path: '/', status: '200', delayMs: '0', headers: 'Content-Type: application/json', body: '{"ok":true}', bodyEncoding: 'text' };
 
 const headersToText = (h: Record<string, string>) => Object.entries(h).map(([k, v]) => `${k}: ${v}`).join('\n');
 
@@ -81,6 +83,7 @@ export function MocksPanel({ slug }: { slug: string }) {
       delayMs: Number(form.delayMs),
       headers: textToHeaders(form.headers),
       body: form.body,
+      bodyEncoding: form.bodyEncoding,
       enabled: rules.find((r) => r.id === editing)?.enabled ?? true,
     };
     try {
@@ -123,6 +126,7 @@ export function MocksPanel({ slug }: { slug: string }) {
       delayMs: String(rule.delayMs),
       headers: headersToText(rule.headers),
       body: rule.body,
+      bodyEncoding: rule.bodyEncoding ?? 'text',
     });
     setEditing(rule.id);
   }
@@ -155,6 +159,7 @@ export function MocksPanel({ slug }: { slug: string }) {
               <span className="meta">
                 → {r.status}
                 {r.delayMs > 0 ? ` · ${r.delayMs} ms` : ''}
+                {r.bodyEncoding === 'base64' ? ' · binary' : ''}
               </span>
               <button onClick={() => startEdit(r)}>Edit</button>
               <button onClick={() => remove(r)} aria-label={`Delete rule for ${r.path}`}>Delete</button>
@@ -178,17 +183,30 @@ export function MocksPanel({ slug }: { slug: string }) {
           <div className="replay-row">
             <label>Status <input type="number" min={200} max={599} value={form.status} onChange={set('status')} aria-label="Status" /></label>
             <label>Delay (ms) <input type="number" min={0} max={10000} value={form.delayMs} onChange={set('delayMs')} aria-label="Delay in milliseconds" /></label>
+            <label>Encoding{' '}
+              <select value={form.bodyEncoding} onChange={set('bodyEncoding')} aria-label="Body encoding">
+                <option value="text">Text</option>
+                <option value="base64">Base64 (binary)</option>
+              </select>
+            </label>
           </div>
           <label className="block">Headers (one per line)
             <textarea rows={2} spellCheck={false} value={form.headers} onChange={set('headers')} aria-label="Response headers" />
           </label>
-          <label className="block">Body
+          <label className="block">{form.bodyEncoding === 'base64' ? 'Body (base64)' : 'Body'}
             <textarea rows={5} spellCheck={false} value={form.body} onChange={set('body')} aria-label="Response body" />
           </label>
-          <p className="meta">
-            Placeholders (body only): <code>{'{{uuid}}'}</code> <code>{'{{now}}'}</code> <code>{'{{params.id}}'}</code>{' '}
-            <code>{'{{request.query.page}}'}</code> <code>{'{{request.json.name}}'}</code> <code>{'{{request.headers.x-id}}'}</code>
-          </p>
+          {form.bodyEncoding === 'base64' ? (
+            <p className="meta">
+              The body is decoded and sent as raw bytes (for example an image or a PDF), up to 256 KB. Placeholders are not filled in.
+              Set a <code>Content-Type</code> header, otherwise <code>application/octet-stream</code> is used.
+            </p>
+          ) : (
+            <p className="meta">
+              Placeholders (body only): <code>{'{{uuid}}'}</code> <code>{'{{now}}'}</code> <code>{'{{params.id}}'}</code>{' '}
+              <code>{'{{request.query.page}}'}</code> <code>{'{{request.json.name}}'}</code> <code>{'{{request.headers.x-id}}'}</code>
+            </p>
+          )}
           <div className="replay-row">
             <button className="primary small" onClick={save}>Save rule</button>
             <button onClick={() => setEditing(null)}>Cancel</button>
