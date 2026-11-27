@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { API_URL, type CapturedRequest } from '../../../lib/api';
+import { MocksPanel } from './mocks-panel';
 import { ReplayPanel } from './replay-panel';
 
 // Show JSON nicely if the body is JSON, otherwise show it as-is.
@@ -84,6 +85,8 @@ export default function EndpointPage() {
         <button onClick={copy}>{copied ? 'Copied ✓' : 'Copy URL'}</button>
         <pre className="hint">curl -X POST {captureUrl} -H "Content-Type: application/json" -d '{`{"hello":"world"}`}'</pre>
       </section>
+
+      <MocksPanel slug={slug} />
 
       <div className="split">
         <ul className="list">

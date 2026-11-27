@@ -44,3 +44,20 @@ button.small { padding:8px 16px; }
 .replay-result { margin-top:14px; }
 .status { font-weight:700; }
 .status.s2 { color:var(--ok); } .status.s3 { color:#f5c451; } .status.s4, .status.s5 { color:var(--bad); }
+
+/* Mock responses panel */
+.mocks { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 16px; margin-bottom:20px; }
+.mocks summary { cursor:pointer; font-weight:600; }
+.mocks .count { background:#2b3040; border-radius:999px; padding:1px 8px; font-size:12px; margin-left:6px; }
+.mocks .meta { color:var(--muted); font-size:13px; }
+.mocks code { background:var(--bg); padding:1px 6px; border-radius:5px; font-size:12px; }
+.rules { list-style:none; margin:10px 0; padding:0; }
+.rules li { display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); }
+.rules li.off .path, .rules li.off .method { opacity:.45; text-decoration:line-through; }
+.rules .path { flex:1; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; }
+.rules button { padding:4px 10px; font-size:13px; }
+.rule-form { margin-top:12px; display:grid; gap:10px; }
+.rule-form label { color:var(--muted); font-size:13px; }
+.rule-form label.block { display:grid; gap:4px; }
+.rule-form input[type=number] { width:90px; margin-left:6px; }
+.method.ANY, .method\* { color:var(--muted); }
