@@ -7,7 +7,7 @@
 
 Your payloads stay on your own server instead of a third-party site.
 
-> **Status: early (v0.1).** Capture, live inspection and replay work today. Mocking and signature checks are on the [roadmap](#roadmap). Contributions are very welcome.
+> **Status: early (v0.1).** Capture, live inspection, replay and mock responses work today. Signature checks are on the [roadmap](#roadmap). Contributions are very welcome.
 
 ## Demo
 
@@ -36,6 +36,7 @@ curl -X POST http://localhost:4000/h/<your-slug>/stripe/events \
 - ✅ **Raw body preserved byte-for-byte**, not re-serialized (important for signature checks)
 - ✅ Live dashboard: new requests appear instantly over Server-Sent Events
 - ✅ **Replay** any captured request to a URL of your choice, editing the method and body first
+- ✅ **Mock responses:** make a capture URL behave like a fake API (status, headers, body with placeholders, delay)
 - ✅ Persistent history in SQLite, a single file with no database server to run
 - ✅ MIT licensed
 
@@ -97,7 +98,49 @@ Stripe / GitHub / curl ──HTTP──►  API (NestJS)  ──►  SQLite file
 | `GET` | `/api/endpoints/:slug/requests` | List captured requests (newest first) |
 | `GET` | `/api/endpoints/:slug/stream` | Live stream of new requests (SSE) |
 | `POST` | `/api/endpoints/:slug/requests/:id/replay` | Resend a captured request. JSON body: `{ "url": "...", "method"?, "headers"?, "body"? }`. Returns the target's `status`, `headers`, `body`, `durationMs` |
-| `ANY` | `/h/:slug[/anything]` | **The capture URL.** Accepts any method and path |
+| `GET` `POST` | `/api/endpoints/:slug/mocks` | List or create mock rules |
+| `PUT` `DELETE` | `/api/endpoints/:slug/mocks/:id` | Replace or delete a mock rule |
+| `ANY` | `/h/:slug[/anything]` | **The capture URL.** Accepts any method and path, and answers with a matching mock rule if there is one |
+
+## Mock responses
+
+By default a capture URL answers `{"ok":true,"id":"..."}`. Add **mock rules** (the *Mock responses* panel on the endpoint page, or the API) to make it behave like a real API, so a frontend can be built before the backend exists, or so you can rehearse failures such as `500`, `429` or a slow reply.
+
+A rule has a **method** (or any), a **path pattern**, a **status**, **headers**, a **body** and an optional **delay**. Rules are tried top to bottom and the first match wins. If none match, the default reply is sent. The request is always captured, mocked or not.
+
+| Path pattern | Matches |
+|---|---|
+| `/users` | exactly `/users` (trailing slashes are ignored) |
+| `/users/:id` | `/users/42` and captures `id=42` |
+| `/files/*` | `/files`, `/files/a`, `/files/a/b/c` (`*` must be the last segment) |
+
+The body can use placeholders, filled in for every request:
+
+| Placeholder | Value |
+|---|---|
+| `{{uuid}}`, `{{now}}`, `{{timestamp}}` | a fresh UUID, ISO time, epoch milliseconds |
+| `{{params.id}}` | a `:param` from the path pattern |
+| `{{request.method}}`, `{{request.path}}` | the incoming method and path |
+| `{{request.query.page}}` | a query-string value |
+| `{{request.headers.x-signature}}` | a request header (lowercase name) |
+| `{{request.body}}` | the raw request body |
+| `{{request.json.user.id}}` | a field of the request body when it is JSON |
+
+Missing values render as an empty string. Placeholders are plain lookups: there is **no code execution**.
+
+```bash
+# a rule: GET /users/:id -> 200 {"id":"{{params.id}}","token":"{{uuid}}"}
+curl -X POST http://localhost:4000/api/endpoints/<slug>/mocks \
+  -H "Content-Type: application/json" \
+  -d '{"method":"GET","path":"/users/:id","status":200,
+       "headers":{"Content-Type":"application/json"},
+       "body":"{\"id\":\"{{params.id}}\",\"token\":\"{{uuid}}\"}","delayMs":300}'
+
+curl http://localhost:4000/h/<slug>/users/42
+# {"id":"42","token":"9b1d..."}
+```
+
+**Safety.** Mocks let users make your server send arbitrary content, so: every mock response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox` (HTML or scripts cannot run on your origin); only the body is templated, never headers, so request data cannot inject headers; `Set-Cookie`, connection-level and security headers cannot be set; delay is capped at 10 s, bodies at 256 KB and rules at 50 per endpoint. Responses include an `X-Hookpit-Mock` header with the matching rule's id.
 
 ## Replay and security
 
@@ -130,7 +173,8 @@ Known limitations: there is no authentication yet (anyone who knows an endpoint 
 - [x] Replay a captured request to any URL, editing it first
 - [ ] Authentication and per-endpoint access control
 - [ ] Faithful replay of binary bodies
-- [ ] Mock responses (custom status, body, headers, delay per path)
+- [x] Mock responses (custom status, body, headers, delay per path)
+- [ ] Reorder mock rules, and show in the dashboard which rule answered a request
 - [ ] Signature verification (Stripe, GitHub, Slack)
 - [ ] OpenAPI import to generate mock endpoints
 - [ ] CLI that forwards requests to `localhost` (`npx hookpit listen 3000`)

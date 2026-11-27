@@ -32,6 +32,21 @@ export class DbService implements OnModuleDestroy {
       );
       CREATE INDEX IF NOT EXISTS idx_requests_slug_time
         ON requests (slug, received_at DESC);
+      CREATE TABLE IF NOT EXISTS mock_rules (
+        id         TEXT PRIMARY KEY,
+        slug       TEXT NOT NULL REFERENCES endpoints(slug),
+        position   INTEGER NOT NULL,          -- rules are tried in this order
+        method     TEXT NOT NULL,             -- an HTTP method, or '*' for any
+        path       TEXT NOT NULL,             -- pattern such as /users/:id
+        status     INTEGER NOT NULL,
+        headers    TEXT NOT NULL,             -- JSON object
+        body       TEXT NOT NULL,             -- may contain {{placeholders}}
+        delay_ms   INTEGER NOT NULL,
+        enabled    INTEGER NOT NULL,          -- 1 or 0
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_mock_rules_slug
+        ON mock_rules (slug, position);
     `);
   }
 
