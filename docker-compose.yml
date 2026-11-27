@@ -9,6 +9,10 @@ services:
       - "4000:4000"
     volumes:
       - hookpit-data:/data   # keeps the SQLite database between restarts
+    environment:
+      # Replay is blocked from reaching private/loopback addresses by default (SSRF
+      # protection). Set to "true" only on an instance you do not expose publicly.
+      HOOKPIT_ALLOW_PRIVATE_TARGETS: ${HOOKPIT_ALLOW_PRIVATE_TARGETS:-false}
     restart: unless-stopped
 
   web:

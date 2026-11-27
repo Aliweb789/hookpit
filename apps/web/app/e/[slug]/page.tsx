@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { API_URL, type CapturedRequest } from '../../../lib/api';
+import { ReplayPanel } from './replay-panel';
 
 // Show JSON nicely if the body is JSON, otherwise show it as-is.
 function prettyBody(body: string): string {
@@ -115,6 +116,8 @@ export default function EndpointPage() {
               <pre>{JSON.stringify(selected.headers, null, 2)}</pre>
               <h3>Body</h3>
               <pre>{prettyBody(selected.body)}</pre>
+              {/* key resets the form when you click a different request */}
+              <ReplayPanel key={selected.id} slug={slug} request={selected} />
             </>
           ) : (
             <p className="empty">Send a request to the URL above and it will show up here.</p>

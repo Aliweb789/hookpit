@@ -5,5 +5,6 @@ import { CaptureService } from './capture.service';
 @Module({
   controllers: [CaptureController],
   providers: [CaptureService],
+  exports: [CaptureService], // the replay module reads stored requests
 })
 export class CaptureModule {}
