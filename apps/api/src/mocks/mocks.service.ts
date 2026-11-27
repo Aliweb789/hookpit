@@ -4,6 +4,11 @@ import { DbService } from '../db/db.service';
 import { isValidPattern, matchPath, type PathParams } from './path-match';
 import { renderTemplate } from './template';
 
+// 'text': the body is sent as UTF-8 and may use {{placeholders}}.
+// 'base64': the body is decoded and sent as raw bytes (images, PDFs, protobuf...), never templated.
+export type BodyEncoding = 'text' | 'base64';
+const BODY_ENCODINGS: readonly BodyEncoding[] = ['text', 'base64'];
+
 export interface MockRule {
   id: string;
   slug: string;
@@ -12,7 +17,8 @@ export interface MockRule {
   path: string;
   status: number;
   headers: Record<string, string>;
-  body: string;
+  body: string; // the text, or the base64 of the bytes when bodyEncoding is 'base64'
+  bodyEncoding: BodyEncoding;
   delayMs: number;
   enabled: boolean;
   createdAt: string;
@@ -24,6 +30,7 @@ export interface MockInput {
   status?: number;
   headers?: Record<string, string>;
   body?: string;
+  bodyEncoding?: BodyEncoding;
   delayMs?: number;
   enabled?: boolean;
 }
@@ -49,6 +56,8 @@ const MAX_HEADER_VALUE = 1000;
 const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/; // an HTTP "token"
 const HEADER_VALUE = /^[\t\x20-\x7e\x80-\xff]*$/; // no CR, LF or other control characters
+// Standard (RFC 4648) base64 with the padding in place. Whitespace is removed before checking.
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 // Headers a mock may not set: they describe the connection (we must control
 // them), or are security-sensitive. Content-Security-Policy and
@@ -72,7 +81,8 @@ const FORBIDDEN_HEADERS = new Set([
 export interface MockResponse {
   status: number;
   headers: Record<string, string>;
-  body: string;
+  body: string | Buffer; // a Buffer for base64 rules
+
   delayMs: number;
 }
 
@@ -98,12 +108,12 @@ export class MocksService {
     this.dbs.db
       .prepare(
         `INSERT INTO mock_rules
-         (id, slug, position, method, path, status, headers, body, delay_ms, enabled, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, slug, position, method, path, status, headers, body, body_encoding, delay_ms, enabled, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id, slug, existing.maxPos + 1, data.method, data.path, data.status,
-        JSON.stringify(data.headers), data.body, data.delayMs, data.enabled ? 1 : 0,
+        JSON.stringify(data.headers), data.body, data.bodyEncoding, data.delayMs, data.enabled ? 1 : 0,
         new Date().toISOString(),
       );
     return this.get(slug, id);
@@ -117,11 +127,11 @@ export class MocksService {
     this.dbs.db
       .prepare(
         `UPDATE mock_rules
-         SET method = ?, path = ?, status = ?, headers = ?, body = ?, delay_ms = ?, enabled = ?
+         SET method = ?, path = ?, status = ?, headers = ?, body = ?, body_encoding = ?, delay_ms = ?, enabled = ?
          WHERE slug = ? AND id = ?`,
       )
       .run(
-        data.method, data.path, data.status, JSON.stringify(data.headers), data.body,
+        data.method, data.path, data.status, JSON.stringify(data.headers), data.body, data.bodyEncoding,
         data.delayMs, data.enabled ? 1 : 0, slug, id,
       );
     return this.get(slug, id);
@@ -144,11 +154,18 @@ export class MocksService {
     return undefined;
   }
 
-  /** Fill in the body template. Headers are sent exactly as configured (never templated). */
+  /**
+   * Fill in the body template, or decode a base64 body to its bytes (never templated).
+   * Headers are sent exactly as configured (never templated).
+   */
   render(
     match: { rule: MockRule; params: PathParams },
     request: { method: string; path: string; query: unknown; headers: unknown; body: string },
   ): MockResponse {
+    const { status, headers, delayMs } = match.rule;
+    if (match.rule.bodyEncoding === 'base64') {
+      return { status, headers, body: Buffer.from(match.rule.body, 'base64'), delayMs };
+    }
     let json: unknown;
     try {
       json = JSON.parse(request.body);
@@ -159,7 +176,7 @@ export class MocksService {
       params: match.params,
       request: { ...request, json },
     });
-    return { status: match.rule.status, headers: match.rule.headers, body, delayMs: match.rule.delayMs };
+    return { status, headers, body, delayMs };
   }
 
   // ---- internals ----
@@ -193,6 +210,7 @@ export class MocksService {
       status: r.status,
       headers: JSON.parse(r.headers),
       body: r.body,
+      bodyEncoding: r.body_encoding === 'base64' ? 'base64' : 'text',
       delayMs: r.delay_ms,
       enabled: r.enabled === 1,
       createdAt: r.created_at,
@@ -222,9 +240,20 @@ export class MocksService {
       fail(`Delay must be an integer from 0 to ${MAX_DELAY_MS} ms.`);
     }
 
-    const body = input.body ?? '';
+    const bodyEncoding = input.bodyEncoding ?? 'text';
+    if (!BODY_ENCODINGS.includes(bodyEncoding)) fail(`Body encoding must be one of ${BODY_ENCODINGS.join(', ')}.`);
+
+    let body = input.body ?? '';
     if (typeof body !== 'string') fail('Body must be a string.');
-    if (Buffer.byteLength(body) > MAX_BODY_BYTES) fail(`Body must be at most ${MAX_BODY_BYTES / 1024} KB.`);
+    if (bodyEncoding === 'base64') {
+      body = body.replace(/\s+/g, ''); // allow line-wrapped base64, store it compact
+      if (!BASE64.test(body)) fail('Body is not valid base64.');
+      if (Buffer.from(body, 'base64').length > MAX_BODY_BYTES) {
+        fail(`Body must decode to at most ${MAX_BODY_BYTES / 1024} KB.`);
+      }
+    } else if (Buffer.byteLength(body) > MAX_BODY_BYTES) {
+      fail(`Body must be at most ${MAX_BODY_BYTES / 1024} KB.`);
+    }
 
     const enabled = input.enabled ?? true;
     if (typeof enabled !== 'boolean') fail('Enabled must be true or false.');
@@ -245,6 +274,6 @@ export class MocksService {
       headers[name.toLowerCase()] = value;
     }
 
-    return { method, path: input.path as string, status, headers, body, delayMs, enabled };
+    return { method, path: input.path as string, status, headers, body, bodyEncoding, delayMs, enabled };
   }
 }
