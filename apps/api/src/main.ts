@@ -1,0 +1,23 @@
+import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as express from 'express';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  // bodyParser: false -> Nest will NOT parse bodies for us.
+  // We want the exact bytes that were sent, not a re-serialized copy.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false,
+  });
+
+  // Keep every body under /h/* as a raw Buffer, whatever its content type.
+  app.use('/h', express.raw({ type: () => true, limit: '1mb' }));
+
+  // The dashboard (a different origin in dev) needs permission to call us.
+  app.enableCors();
+
+  const port = Number(process.env.PORT ?? 4000);
+  await app.listen(port);
+  console.log(`Hookpit API listening on http://localhost:${port}`);
+}
+bootstrap();
