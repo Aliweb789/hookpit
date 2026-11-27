@@ -31,3 +31,6 @@ jobs:
 
       # Builds apps/api (NestJS) then apps/web (Next.js, includes type checks).
       - run: npm run build
+
+      # Unit tests (CaptureService) and end-to-end HTTP tests (in-memory SQLite).
+      - run: npm test

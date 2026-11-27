@@ -85,7 +85,7 @@ Stripe / GitHub / curl ──HTTP──►  API (NestJS)  ──►  SQLite file
 - [ ] CLI that forwards requests to `localhost` (`npx hookpit listen 3000`)
 - [ ] Automatic expiry and rate limiting for public instances
 - [x] CI (build on every pull request)
-- [ ] Automated tests
+- [x] Automated tests for the API (unit and end-to-end; dashboard tests still welcome)
 
 ## Contributing
 
