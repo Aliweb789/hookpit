@@ -72,7 +72,19 @@ export class CaptureService {
         'SELECT * FROM requests WHERE slug = ? ORDER BY received_at DESC LIMIT ?',
       )
       .all(slug, limit) as any[];
-    return rows.map((r) => ({
+    return rows.map((r) => this.toCaptured(r));
+  }
+
+  // One captured request by id, but only if it belongs to this slug.
+  getById(slug: string, id: string): CapturedRequest | undefined {
+    const row = this.dbs.db
+      .prepare('SELECT * FROM requests WHERE slug = ? AND id = ?')
+      .get(slug, id);
+    return row ? this.toCaptured(row as any) : undefined;
+  }
+
+  private toCaptured(r: any): CapturedRequest {
+    return {
       id: r.id,
       slug: r.slug,
       method: r.method,
@@ -83,7 +95,7 @@ export class CaptureService {
       bodySize: r.body_size,
       ip: r.ip,
       receivedAt: r.received_at,
-    }));
+    };
   }
 
   // Stream of new requests for one slug.

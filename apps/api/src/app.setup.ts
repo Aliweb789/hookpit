@@ -7,6 +7,9 @@ export function configureApp(app: NestExpressApplication) {
   // Keep every body under /h/* as a raw Buffer, whatever its content type.
   app.use('/h', express.raw({ type: () => true, limit: '1mb' }));
 
+  // The management API (/api/*) speaks normal JSON.
+  app.use('/api', express.json({ limit: '1mb' }));
+
   // The dashboard (a different origin in dev) needs permission to call us.
   app.enableCors();
 }
