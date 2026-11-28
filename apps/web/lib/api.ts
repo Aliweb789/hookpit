@@ -15,4 +15,14 @@ export interface CapturedRequest {
   bodySize: number;
   ip: string;
   receivedAt: string;
+  /** Only present when the endpoint has a signing secret configured. */
+  signature?: SignatureResult;
+}
+
+export type SignatureProvider = 'github' | 'stripe' | 'slack';
+
+export interface SignatureResult {
+  provider: SignatureProvider;
+  status: 'valid' | 'invalid' | 'missing';
+  reason?: string;
 }

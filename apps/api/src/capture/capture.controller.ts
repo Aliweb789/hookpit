@@ -4,6 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { Observable, map } from 'rxjs';
 import { MocksService } from '../mocks/mocks.service';
+import { SigningService } from '../signing/signing.service';
 import { CaptureService } from './capture.service';
 
 function isJson(text: string): boolean {
@@ -20,6 +21,7 @@ export class CaptureController {
   constructor(
     private readonly capture: CaptureService,
     private readonly mocks: MocksService,
+    private readonly signing: SigningService,
   ) {}
 
   // --- Management API (used by the dashboard) ---
@@ -32,14 +34,15 @@ export class CaptureController {
   @Get('api/endpoints/:slug/requests')
   list(@Param('slug') slug: string) {
     if (!this.capture.endpointExists(slug)) throw new NotFoundException();
-    return this.capture.list(slug);
+    // With a signing secret configured, each request also carries a `signature` result.
+    return this.signing.annotateAll(slug, this.capture.list(slug));
   }
 
   // @Sse turns the returned Observable into a Server-Sent Events stream.
   @Sse('api/endpoints/:slug/stream')
   stream(@Param('slug') slug: string): Observable<{ data: unknown }> {
     if (!this.capture.endpointExists(slug)) throw new NotFoundException();
-    return this.capture.stream(slug).pipe(map((r) => ({ data: r })));
+    return this.capture.stream(slug).pipe(map((r) => ({ data: this.signing.annotate(slug, r) })));
   }
 
   // --- Catch-all: the public URL that other services call ---
