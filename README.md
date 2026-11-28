@@ -44,6 +44,7 @@ curl -X POST http://localhost:4000/h/<your-slug>/stripe/events \
 - ✅ **Raw body preserved byte-for-byte**, not re-serialized (important for signature checks)
 - ✅ Live dashboard: new requests appear instantly over Server-Sent Events
 - ✅ **Replay** any captured request to a URL of your choice, editing the method and body first
+- ✅ **Signature check:** add the signing secret for GitHub, Stripe or Slack and every captured request is marked valid, invalid or unsigned
 - ✅ **Mock responses:** make a capture URL behave like a fake API (status, headers, body with placeholders, delay)
 - ✅ Persistent history in SQLite, a single file with no database server to run
 - ✅ MIT licensed
@@ -106,6 +107,7 @@ Stripe / GitHub / curl ──HTTP──►  API (NestJS)  ──►  SQLite file
 | `GET` | `/api/endpoints/:slug/requests` | List captured requests (newest first) |
 | `GET` | `/api/endpoints/:slug/stream` | Live stream of new requests (SSE) |
 | `POST` | `/api/endpoints/:slug/requests/:id/replay` | Resend a captured request. JSON body: `{ "url": "...", "method"?, "headers"?, "body"? }`. Returns the target's `status`, `headers`, `body`, `durationMs` |
+| `GET` `PUT` `DELETE` | `/api/endpoints/:slug/signing` | Read, set (`{ "provider": "github\|stripe\|slack", "secret": "..." }`) or remove the signing secret. The secret is write-only and is never returned |
 | `GET` `POST` | `/api/endpoints/:slug/mocks` | List or create mock rules |
 | `PUT` `DELETE` | `/api/endpoints/:slug/mocks/:id` | Replace or delete a mock rule |
 | `ANY` | `/h/:slug[/anything]` | **The capture URL.** Accepts any method and path, and answers with a matching mock rule if there is one |
@@ -159,6 +161,35 @@ curl -X POST http://localhost:4000/api/endpoints/<slug>/mocks \
 
 **Safety.** Mocks let users make your server send arbitrary content, so: every mock response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox` (HTML or scripts cannot run on your origin); only the body is templated, never headers, so request data cannot inject headers; `Set-Cookie`, connection-level and security headers cannot be set; delay is capped at 10 s, bodies at 256 KB (after decoding, for base64 bodies) and rules at 50 per endpoint. Responses include an `X-Hookpit-Mock` header with the matching rule's id.
 
+## Signature verification
+
+Services such as GitHub, Stripe and Slack sign each webhook with a shared secret, so your handler can tell a real delivery from a forged one. Hookpit can run the same check on everything it captures, which helps when a handler rejects requests and you cannot tell whether the secret, the body or the code is wrong.
+
+Open **Signature check** on the endpoint page, pick the provider and paste its secret. Every request then gets a badge: **Signed** (the signature matches the secret and the exact body), **Bad signature**, or **Unsigned** (no signature header). The detail view says why.
+
+| Provider | Header(s) checked | Secret to paste |
+|---|---|---|
+| GitHub | `X-Hub-Signature-256` | the webhook secret |
+| Stripe | `Stripe-Signature` | the signing secret that starts with `whsec_` |
+| Slack | `X-Slack-Signature` and `X-Slack-Request-Timestamp` | the app's Signing Secret |
+
+```bash
+# set a secret from the command line, then read back what Hookpit may say about it
+curl -X PUT http://localhost:4000/api/endpoints/<slug>/signing \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"github","secret":"my-webhook-secret"}'
+# {"configured":true,"provider":"github"}   (the secret is never returned)
+```
+
+Things worth knowing:
+
+- Results are computed when requests are read, so changing the secret re-checks everything already captured.
+- The check covers the **exact bytes** that arrived. A reformatted JSON body no longer matches, and neither does an edited replay (see [#26](../../issues/26)).
+- **Timestamps are not checked for age.** Hookpit shows old captures, so a "reject anything older than 5 minutes" rule would mark all of them bad. The timestamp is still part of what is signed.
+- Comparison is constant-time, and the API never puts the secret or the expected signature in a response, the live stream or an error message.
+- The secret is stored as plain text in the SQLite file, next to the payloads it protects. There is no authentication yet, so on a shared instance anyone who knows an endpoint slug can change or remove its secret. Use it on a private instance for now.
+- Bodies are kept as UTF-8 text, so a binary payload that is not valid UTF-8 cannot be verified (see the binary-body item in the roadmap).
+
 ## Replay and security
 
 Replay makes the **Hookpit server** call a URL you provide. On a server that is reachable by other people, that is a classic [SSRF](https://owasp.org/www-community/attacks/Server_Side_Request_Forgery) risk (reaching cloud metadata services, databases or admin panels on the private network), so replay is **safe by default**:
@@ -203,7 +234,8 @@ Known limitations: there is no authentication yet (anyone who knows an endpoint 
 - [ ] Faithful replay of binary bodies
 - [x] Mock responses (custom status, body, headers, delay per path)
 - [ ] Reorder mock rules, and show in the dashboard which rule answered a request
-- [ ] Signature verification (Stripe, GitHub, Slack)
+- [x] Signature verification (GitHub, Stripe, Slack)
+- [ ] Re-sign or strip the signature when replaying an edited request ([#26](../../issues/26))
 - [ ] OpenAPI import to generate mock endpoints
 - [ ] CLI that forwards requests to `localhost` (`npx hookpit listen 3000`)
 - [x] Basic rate limiting for replay and capture
