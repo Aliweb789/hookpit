@@ -82,7 +82,6 @@ export interface MockResponse {
   status: number;
   headers: Record<string, string>;
   body: string | Buffer; // a Buffer for base64 rules
-
   delayMs: number;
 }
 
