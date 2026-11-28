@@ -3,6 +3,7 @@ import { CaptureModule } from './capture/capture.module';
 import { DbModule } from './db/db.module';
 import { MocksModule } from './mocks/mocks.module';
 import { ReplayModule } from './replay/replay.module';
+import { SigningModule } from './signing/signing.module';
 
-@Module({ imports: [DbModule, CaptureModule, MocksModule, ReplayModule] })
+@Module({ imports: [DbModule, CaptureModule, MocksModule, ReplayModule, SigningModule] })
 export class AppModule {}

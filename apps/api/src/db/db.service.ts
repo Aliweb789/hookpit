@@ -46,6 +46,12 @@ export class DbService implements OnModuleDestroy {
         enabled    INTEGER NOT NULL,          -- 1 or 0
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS signing_configs (
+        slug       TEXT PRIMARY KEY REFERENCES endpoints(slug),
+        provider   TEXT NOT NULL,             -- github, stripe or slack
+        secret     TEXT NOT NULL,             -- write-only: never sent back by the API
+        updated_at TEXT NOT NULL
+      );
       CREATE INDEX IF NOT EXISTS idx_mock_rules_slug
         ON mock_rules (slug, position);
     `);
