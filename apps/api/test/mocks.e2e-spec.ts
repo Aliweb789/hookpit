@@ -23,6 +23,12 @@ describe('Mock responses (end to end)', () => {
 
   const http = () => request(app.getHttpServer());
   const addMock = (rule: object, s = slug) => http().post(`/api/endpoints/${s}/mocks`).send(rule);
+  // Collect the raw response bytes, whatever the content type.
+  const asBuffer = (res: any, done: (err: Error | null, body: Buffer) => void) => {
+    const chunks: Buffer[] = [];
+    res.on('data', (c: Buffer) => chunks.push(c));
+    res.on('end', () => done(null, Buffer.concat(chunks)));
+  };
 
   describe('management API', () => {
     it('creates, lists, updates and deletes a rule', async () => {
@@ -55,6 +61,9 @@ describe('Mock responses (end to end)', () => {
       ['a forbidden header', { path: '/a', headers: { 'Set-Cookie': 'a=b' } }],
       ['header injection', { path: '/a', headers: { 'x-a': 'v\r\nx-b: 1' } }],
       ['a delay over the cap', { path: '/a', delayMs: 60000 }],
+      ['an unknown body encoding', { path: '/a', bodyEncoding: 'hex' }],
+      ['invalid base64', { path: '/a', bodyEncoding: 'base64', body: '%%%' }],
+      ['a base64 body over 256 KB once decoded', { path: '/a', bodyEncoding: 'base64', body: Buffer.alloc(256 * 1024 + 1).toString('base64') }],
     ])('answers 400 for %s', async (_label, rule) => {
       const res = await addMock(rule).expect(400);
       expect(res.body.message).toBeTruthy();
@@ -154,6 +163,36 @@ describe('Mock responses (end to end)', () => {
       const head = await http().head(`/h/${slug}/page`).expect(201); // the mock itself answered HEAD
       expect(head.headers['x-mock']).toBe('head');
       expect(head.text).toBeFalsy();
+    });
+
+    it('serves a base64 body as the exact bytes, with the security headers', async () => {
+      // A complete 1x1 PNG.
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      await addMock({
+        method: 'GET', path: '/logo.png', headers: { 'Content-Type': 'image/png' },
+        bodyEncoding: 'base64', body: png.toString('base64'),
+      }).expect(201);
+      const res = await http()
+        .get(`/h/${slug}/logo.png`)
+        .buffer(true)
+        .parse(asBuffer)
+        .expect(200);
+      expect(Buffer.isBuffer(res.body)).toBe(true);
+      expect((res.body as Buffer).equals(png)).toBe(true);
+      expect(res.headers['content-type']).toBe('image/png');
+      expect(res.headers['content-length']).toBe(String(png.length));
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['content-security-policy']).toContain('sandbox');
+    });
+
+    it('does not fill placeholders in a base64 body, and defaults to application/octet-stream', async () => {
+      await addMock({ path: '/raw', bodyEncoding: 'base64', body: Buffer.from('{{uuid}}').toString('base64') });
+      const res = await http().get(`/h/${slug}/raw`).buffer(true).parse(asBuffer).expect(200);
+      expect((res.body as Buffer).toString()).toBe('{{uuid}}');
+      expect(res.headers['content-type']).toBe('application/octet-stream');
     });
 
     it('chooses a content type when the rule gives none', async () => {

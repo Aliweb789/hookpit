@@ -33,7 +33,7 @@ describe('MocksService', () => {
     it('creates a rule with sensible defaults', () => {
       const rule = service.create(slug, { path: '/ping' });
       expect(rule).toMatchObject({
-        slug, method: '*', path: '/ping', status: 200, headers: {}, body: '', delayMs: 0, enabled: true, position: 1,
+        slug, method: '*', path: '/ping', status: 200, headers: {}, body: '', bodyEncoding: 'text', delayMs: 0, enabled: true, position: 1,
       });
       expect(rule.id).toBeTruthy();
     });
@@ -143,6 +143,14 @@ describe('MocksService', () => {
       expect(service.render(match, req({ body: 'plain text' })).body).toBe('[]');
     });
 
+    it('decodes a base64 body to its exact bytes and never templates it', () => {
+      const bytes = Buffer.from([0x00, 0xff, 0x7b, 0x7b, 0x75, 0x75, 0x69, 0x64, 0x7d, 0x7d, 0x80]); // contains "{{uuid}}"
+      service.create(slug, { path: '/bin', bodyEncoding: 'base64', body: bytes.toString('base64') });
+      const body = service.render(service.findMatch(slug, 'GET', '/bin')!, req()).body;
+      expect(Buffer.isBuffer(body)).toBe(true);
+      expect((body as Buffer).equals(bytes)).toBe(true);
+    });
+
     it('never templates headers, so request data cannot inject header values', () => {
       service.create(slug, { path: '/a', headers: { 'x-echo': '{{request.query.v}}' } });
       const match = service.findMatch(slug, 'GET', '/a')!;
@@ -171,6 +179,33 @@ describe('MocksService', () => {
       ['headers not an object', { path: '/a', headers: ['a'] }],
       ['too many headers', { path: '/a', headers: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`x-h${i}`, 'v'])) }],
     ])('rejects %s', (_label, payload) => invalid(() => service.create(slug, payload as any)));
+
+    describe('base64 bodies', () => {
+      it.each([
+        ['an unknown encoding', { path: '/a', bodyEncoding: 'hex', body: '00' }],
+        ['characters outside the alphabet', { path: '/a', bodyEncoding: 'base64', body: 'not base64!' }],
+        ['a wrong length', { path: '/a', bodyEncoding: 'base64', body: 'abcde' }],
+        ['misplaced padding', { path: '/a', bodyEncoding: 'base64', body: 'ab=c' }],
+        ['a decoded size over the cap', { path: '/a', bodyEncoding: 'base64', body: Buffer.alloc(MAX_BODY_BYTES + 1).toString('base64') }],
+      ])('rejects %s', (_label, payload) => invalid(() => service.create(slug, payload as any)));
+
+      it('accepts the largest allowed decoded body', () => {
+        const body = Buffer.alloc(MAX_BODY_BYTES, 7).toString('base64'); // longer than the cap as text
+        expect(service.create(slug, { path: '/a', bodyEncoding: 'base64', body }).bodyEncoding).toBe('base64');
+      });
+
+      it('accepts line-wrapped base64 and stores it without whitespace', () => {
+        const rule = service.create(slug, { path: '/a', bodyEncoding: 'base64', body: 'aGVs\nbG8=\r\n' });
+        expect(rule.body).toBe('aGVsbG8=');
+      });
+
+      it('keeps text bodies untouched and the encoding on update', () => {
+        const rule = service.create(slug, { path: '/a', body: ' not base64! ' });
+        expect(rule).toMatchObject({ body: ' not base64! ', bodyEncoding: 'text' });
+        const updated = service.update(slug, rule.id, { path: '/a', bodyEncoding: 'base64', body: 'AAE=' });
+        expect(updated).toMatchObject({ body: 'AAE=', bodyEncoding: 'base64' });
+      });
+    });
 
     it('accepts the largest allowed delay and body', () => {
       expect(() => service.create(slug, { path: '/a', delayMs: MAX_DELAY_MS, body: 'x'.repeat(MAX_BODY_BYTES) })).not.toThrow();

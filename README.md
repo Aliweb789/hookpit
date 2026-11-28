@@ -148,7 +148,16 @@ curl http://localhost:4000/h/<slug>/users/42
 # {"id":"42","token":"9b1d..."}
 ```
 
-**Safety.** Mocks let users make your server send arbitrary content, so: every mock response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox` (HTML or scripts cannot run on your origin); only the body is templated, never headers, so request data cannot inject headers; `Set-Cookie`, connection-level and security headers cannot be set; delay is capped at 10 s, bodies at 256 KB and rules at 50 per endpoint. Responses include an `X-Hookpit-Mock` header with the matching rule's id.
+**Binary bodies.** To mock an image, a PDF, a protobuf message or any other binary response, set `"bodyEncoding": "base64"` (the *Encoding* choice in the panel) and put the base64 of the bytes in `body`. The body is decoded and sent byte for byte; placeholders are **not** filled in. Set a `Content-Type` header, otherwise `application/octet-stream` is used. The default, `"text"`, behaves as described above.
+
+```bash
+curl -X POST http://localhost:4000/api/endpoints/<slug>/mocks \
+  -H "Content-Type: application/json" \
+  -d "{\"path\":\"/logo.png\",\"headers\":{\"Content-Type\":\"image/png\"},
+       \"bodyEncoding\":\"base64\",\"body\":\"$(base64 -w0 logo.png)\"}"
+```
+
+**Safety.** Mocks let users make your server send arbitrary content, so: every mock response carries `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox` (HTML or scripts cannot run on your origin); only the body is templated, never headers, so request data cannot inject headers; `Set-Cookie`, connection-level and security headers cannot be set; delay is capped at 10 s, bodies at 256 KB (after decoding, for base64 bodies) and rules at 50 per endpoint. Responses include an `X-Hookpit-Mock` header with the matching rule's id.
 
 ## Replay and security
 
