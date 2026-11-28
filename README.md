@@ -174,7 +174,18 @@ HOOKPIT_ALLOW_PRIVATE_TARGETS=true npm run start -w apps/api
 HOOKPIT_ALLOW_PRIVATE_TARGETS=true docker compose up --build
 ```
 
-Known limitations: there is no authentication yet (anyone who knows an endpoint slug and request id can replay it), replay has no rate limiting, and bodies are stored as UTF-8 text so binary payloads may not replay byte-for-byte. See the roadmap.
+## Rate limiting
+
+Replay and capture are rate limited per client IP (capture also per endpoint slug), so a public instance cannot be used as an open request relay or flooded to fill the database. Over the limit the API answers `429 Too Many Requests` with a `Retry-After` header (seconds). Counters are kept in memory, so each instance counts on its own.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `HOOKPIT_REPLAY_RATE_LIMIT` | `30` | Replays per client IP per window. `0` turns the limit off. |
+| `HOOKPIT_CAPTURE_RATE_LIMIT` | `600` | Captured requests per endpoint slug and client IP per window. `0` turns the limit off. |
+| `HOOKPIT_RATE_WINDOW_MS` | `60000` | Window length in milliseconds. |
+| `HOOKPIT_TRUST_PROXY` | unset | Behind a reverse proxy, set to the number of proxy hops (for example `1`) or `true` so the client IP is read from `X-Forwarded-For`. Without it every client behind the proxy shares the proxy's IP. |
+
+Known limitations: there is no authentication yet (anyone who knows an endpoint slug and request id can replay it), and bodies are stored as UTF-8 text so binary payloads may not replay byte-for-byte. See the roadmap.
 
 ## Roadmap
 
