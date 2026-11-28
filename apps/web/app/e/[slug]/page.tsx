@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { API_URL, type CapturedRequest } from '../../../lib/api';
+import { API_URL, type CapturedRequest, type SignatureResult } from '../../../lib/api';
 import { formatBytes, timeAgo } from '../../../lib/time';
-import { CheckIcon, CopyIcon, InboxIcon } from '../../icons';
+import { CheckIcon, CopyIcon, InboxIcon, ShieldIcon, XIcon } from '../../icons';
 import { MocksPanel } from './mocks-panel';
 import { ReplayPanel } from './replay-panel';
+import { PROVIDER_LABEL, SigningPanel } from './signing-panel';
 
 type Status = 'loading' | 'live' | 'notfound' | 'offline';
 
@@ -49,6 +50,22 @@ function JsonView({ text }: { text: string }) {
   );
 }
 
+const SIG_LABEL: Record<SignatureResult['status'], string> = {
+  valid: 'Signed',
+  invalid: 'Bad signature',
+  missing: 'Unsigned',
+};
+
+// Always an icon and a word, so the state does not depend on colour alone.
+function SignatureBadge({ result }: { result: SignatureResult }) {
+  return (
+    <span className={`sig ${result.status}`}>
+      {result.status === 'valid' ? <CheckIcon /> : result.status === 'invalid' ? <XIcon /> : <ShieldIcon />}
+      {SIG_LABEL[result.status]}
+    </span>
+  );
+}
+
 function KeyValue({ data }: { data: Record<string, unknown> }) {
   const entries = Object.entries(data);
   if (entries.length === 0) return null;
@@ -86,6 +103,16 @@ export default function EndpointPage() {
     const timer = setInterval(() => setNow(Date.now()), 10_000);
     return () => clearInterval(timer);
   }, []);
+
+  // Re-read the list, e.g. after a signing secret is added or removed, so the badges update.
+  async function refresh() {
+    try {
+      const res = await fetch(`${API_URL}/api/endpoints/${slug}/requests`);
+      if (res.ok) setRequests(await res.json());
+    } catch {
+      /* the live status pill already shows when the API is unreachable */
+    }
+  }
 
   // Runs once after the page appears (and again if slug changes).
   useEffect(() => {
@@ -214,6 +241,7 @@ export default function EndpointPage() {
                     <span className="item-top">
                       <span className={`method ${r.method}`}>{r.method}</span>
                       <span className="path">{r.path}</span>
+                      {r.signature && <SignatureBadge result={r.signature} />}
                     </span>
                     <span className="item-meta">
                       <time dateTime={r.receivedAt} title={new Date(r.receivedAt).toLocaleString()}>
@@ -245,6 +273,18 @@ export default function EndpointPage() {
               </div>
 
               <div className="detail-body">
+                {selected.signature && (
+                  <section className="block">
+                    <h3>Signature</h3>
+                    <SignatureBadge result={selected.signature} />
+                    <p className="meta sig-note">
+                      {selected.signature.status === 'valid'
+                        ? `The ${PROVIDER_LABEL[selected.signature.provider]} signature matches your secret and this exact body.`
+                        : selected.signature.reason}
+                    </p>
+                  </section>
+                )}
+
                 <section className="block">
                   <h3>Query</h3>
                   {Object.keys(selected.query).length > 0 ? (
@@ -281,6 +321,7 @@ export default function EndpointPage() {
       )}
 
       {/* Configuration lives below the live feed: you watch requests far more often than you edit mocks. */}
+      <SigningPanel slug={slug} onChange={refresh} />
       <MocksPanel slug={slug} />
     </div>
   );
