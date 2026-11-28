@@ -176,7 +176,7 @@ HOOKPIT_ALLOW_PRIVATE_TARGETS=true docker compose up --build
 
 ## Rate limiting
 
-Replay and capture are rate limited per client IP (capture also per endpoint slug), so a public instance cannot be used as an open request relay or flooded to fill the database. Over the limit the API answers `429 Too Many Requests` with a `Retry-After` header (seconds). Counters are kept in memory, so each instance counts on its own.
+Replay and capture are rate limited per client IP (capture also per endpoint slug). This is basic protection against abuse of a public instance, not a complete one: creating endpoints is not limited yet, so a client can still spread requests over many endpoints ([#24](../../issues/24)). Over the limit the API answers `429 Too Many Requests` with a `Retry-After` header (seconds). Counters are kept in memory, so each instance counts on its own.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -197,7 +197,8 @@ Known limitations: there is no authentication yet (anyone who knows an endpoint 
 - [ ] Signature verification (Stripe, GitHub, Slack)
 - [ ] OpenAPI import to generate mock endpoints
 - [ ] CLI that forwards requests to `localhost` (`npx hookpit listen 3000`)
-- [ ] Automatic expiry and rate limiting for public instances
+- [x] Basic rate limiting for replay and capture
+- [ ] Rate limit endpoint creation, and automatic expiry of old data on public instances
 - [x] CI (build on every pull request)
 - [x] Automated tests for the API (unit and end-to-end; dashboard tests still welcome)
 
