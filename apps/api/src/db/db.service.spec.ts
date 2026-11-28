@@ -37,7 +37,9 @@ describe('DbService', () => {
         dbs.onModuleDestroy();
       }
     } finally {
-      process.env.HOOKPIT_DB = previous;
+      // Assigning undefined would store the string "undefined" in process.env.
+      if (previous === undefined) delete process.env.HOOKPIT_DB;
+      else process.env.HOOKPIT_DB = previous;
     }
   });
 });
